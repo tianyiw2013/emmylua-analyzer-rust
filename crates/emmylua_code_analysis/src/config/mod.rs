@@ -4,7 +4,7 @@ mod flatten_config;
 
 use std::{
     collections::{HashMap, HashSet},
-    path::{Path, PathBuf, Component},
+    path::{Component, Path, PathBuf},
 };
 
 pub use config_loader::{load_configs, load_configs_raw};
@@ -20,6 +20,7 @@ use regex::Regex;
 use rowan::NodeCache;
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
+use std::ffi::OsString;
 
 #[derive(Serialize, Deserialize, Debug, JsonSchema, Default, Clone)]
 #[serde(rename_all = "camelCase")]
@@ -143,14 +144,13 @@ fn pre_process_path(path: &str, workspace: &Path) -> String {
 
     // Compute a PathBuf result first, then lexical-normalize it before producing final String.
     let result_buf: PathBuf = if path.starts_with('~') {
-        let home_dir = match dirs::home_dir() {
-            Some(path) => path,
+        match dirs::home_dir() {
+            Some(home_dir) => home_dir.join(&path[1..]),
             None => {
                 log::error!("Warning: Home directory not found");
-                return path;
+                PathBuf::from(&path)
             }
-        };
-        home_dir.join(&path[1..])
+        }
     } else if path.starts_with("./") {
         workspace.join(&path[2..])
     } else if PathBuf::from(&path).is_absolute() {
@@ -208,8 +208,6 @@ fn replace_placeholders(input: &str, workspace_folder: &str) -> String {
 /// without hitting the filesystem. Preserves drive/prefix and absolute/root characteristics.
 /// This is intentionally lexical and will not resolve symlinks.
 fn normalize_path(path: &Path) -> PathBuf {
-    use std::ffi::OsString;
-
     let mut out: Vec<OsString> = Vec::new();
     let mut prefix: Option<OsString> = None;
     let mut has_root = false;
