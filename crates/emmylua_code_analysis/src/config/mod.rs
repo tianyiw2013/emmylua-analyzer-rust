@@ -143,7 +143,8 @@ fn pre_process_path(path: &str, workspace: &Path) -> String {
     path = replace_placeholders(&path, workspace_str);
 
     // Compute a PathBuf result first, then lexical-normalize it before producing final String.
-    let result_buf: PathBuf = if path.starts_with('~') {
+    let result_buf: PathBuf = if path.starts_with("~") {
+        // 使用字符串前缀检测（而非 char），并且显式转换为 Path/PathBuf
         match dirs::home_dir() {
             Some(home_dir) => home_dir.join(&path[1..]),
             None => {
@@ -151,11 +152,13 @@ fn pre_process_path(path: &str, workspace: &Path) -> String {
                 PathBuf::from(&path)
             }
         }
-    } else if path.starts_with("./") {
-        workspace.join(&path[2..])
-    } else if PathBuf::from(&path).is_absolute() {
+    } else if let Some(stripped) = path.strip_prefix("./") {
+        // 更安全地使用 strip_prefix，避免直接用索引
+        workspace.join(stripped)
+    } else if Path::new(&path).is_absolute() {
         PathBuf::from(&path)
     } else {
+        // 非绝对路径且非相对 "./"，用 workspace.join
         workspace.join(&path)
     };
 
